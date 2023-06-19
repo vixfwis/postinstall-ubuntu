@@ -1,0 +1,66 @@
+- name: install
+  become: yes
+  apt:
+    name:
+      - zsh
+      - ripgrep
+      - fd-find
+      - fzf
+      - exa
+    state: present
+
+- name: symlink fd
+  become: yes
+  file:
+    src: /usr/bin/fdfind
+    dest: /usr/bin/fd
+    owner: root
+    group: root
+    state: link
+
+- name: get effective user
+  command: id -un
+  register: user
+  changed_when: false
+
+- name: get effective user info
+  command: "grep -E \"^{{ user.stdout }}:\" /etc/passwd"
+  register: user
+  changed_when: false
+
+- name: export user info
+  set_fact:
+    e_username: "{{ (user.stdout | split(':'))[0] }}"
+    e_homedir: "{{ (user.stdout | split(':'))[5] }}"
+    e_shell: "{{ (user.stdout | split(':'))[6] }}"
+
+- name: check if omz folder exists
+  stat:
+    path: "{{ e_homedir }}/.oh-my-zsh"
+  register: stat
+
+- name: install oh-my-zsh
+  shell:
+    cmd: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+  when: not stat.stat.exists
+
+- name: copy theme
+  template:
+    src: robbyrussell-mod.zsh-theme
+    dest: "{{ e_homedir }}/.oh-my-zsh/custom/themes/robbyrussell-mod.zsh-theme"
+
+- name: enable theme
+  lineinfile:
+    path: "{{ e_homedir }}/.zshrc"
+    regexp: ^ZSH_THEME=
+    line: ZSH_THEME="robbyrussell-mod"
+
+- name: copy options
+  copy:
+    src: managed-custom-options.zsh
+    dest: "{{ e_homedir }}/.oh-my-zsh/custom/managed-custom-options.zsh"
+
+- name: change shell
+  become: yes
+  command: "chsh -s /bin/zsh {{ e_username }}"
+  when: 'e_shell != "/bin/zsh"'

@@ -1,0 +1,66 @@
+- name: install nvim
+  become: yes
+  apt:
+    name:
+      - neovim
+      - git
+    state: present
+
+- name: set global editor
+  become: yes
+  lineinfile:
+    path: /etc/environment
+    regexp: "^{{ item.key }}="
+    line: "{{ item.key }}={{ item.value }}"
+  loop:
+    - { key: "EDITOR", value: "/usr/bin/nvim" }
+
+- name: set ubuntu alternatives
+  become: yes
+  command: "update-alternatives --set {{ item.key }} {{ item.path }}"
+  loop:
+    - { key: "vim", path: "/usr/bin/nvim" }
+    - { key: "editor", path: "/usr/bin/nvim" }
+    - { key: "vimdiff", path: "/usr/libexec/neovim/vimdiff" }
+    - { key: "rview", path: "/usr/libexec/neovim/rview" }
+    - { key: "rvim", path: "/usr/libexec/neovim/rvim" }
+    - { key: "vi", path: "/usr/bin/nvim" }
+    - { key: "view", path: "/usr/libexec/neovim/view" }
+  changed_when: false
+
+- name: get effective user
+  command: id -un
+  register: user
+  changed_when: false
+
+- name: get effective user info
+  command: "grep -E \"^{{ user.stdout }}:\" /etc/passwd"
+  register: user
+  changed_when: false
+
+- name: export user info
+  set_fact:
+    e_username: "{{ (user.stdout | split(':'))[0] }}"
+    e_homedir: "{{ (user.stdout | split(':'))[5] }}"
+    e_shell: "{{ (user.stdout | split(':'))[6] }}"
+
+- name: create dot folders for nvim
+  file:
+    path: "{{ item }}"
+    state: directory
+    recurse: yes
+  loop:
+    - "{{ e_homedir }}/.local/share/nvim/site/autoload"
+    - "{{ e_homedir }}/.config/nvim"
+
+- name: fetch vimplug
+  command: "curl -fLo {{ e_homedir }}/.local/share/nvim/site/autoload/plug.vim \
+    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim"
+
+- name: copy config
+  copy:
+    src: init.vim
+    dest: "{{ e_homedir }}/.config/nvim/init.vim"
+
+- name: fetch plugins
+  command: nvim --headless -c ":PlugUpdate" -c ":qa"

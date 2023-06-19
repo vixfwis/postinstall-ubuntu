@@ -1,0 +1,35 @@
+- name: install ufw
+  become: yes
+  apt:
+    name: ufw
+    state: present
+
+- name: set default ufw rules
+  become: yes
+  ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - { direction: "incoming", policy: "deny" }
+    - { direction: "outgoing", policy: "allow" }
+    - { direction: "routed",   policy: "deny" }
+
+- name: allow incoming ssh
+  become: yes
+  ufw:
+    direction: in
+    rule: allow
+    port: "{{ ansible_port }}"
+    proto: tcp
+
+- name: enable and start ufw service
+  become: yes
+  systemd:
+    name: ufw
+    state: started
+    enabled: yes
+
+- name: enable and start ufw
+  become: yes
+  ufw:
+    state: enabled

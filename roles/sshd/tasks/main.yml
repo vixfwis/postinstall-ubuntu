@@ -1,0 +1,21 @@
+- name: sshd_config
+  become: yes
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.pattern }}"
+    line: "{{ item.line }}"
+    validate: sshd -t -f %s
+  register: sshd_config
+  loop:
+    - { pattern: "^PermitRootLogin",                 line: "PermitRootLogin no" }
+    - { pattern: "^PubkeyAuthentication",            line: "PubkeyAuthentication yes" }
+    - { pattern: "^PasswordAuthentication",          line: "PasswordAuthentication no" }
+    - { pattern: "^PermitEmptyPasswords",            line: "PermitEmptyPasswords no" }
+    - { pattern: "^ChallengeResponseAuthentication", line: "ChallengeResponseAuthentication no" }
+
+- name: restart sshd
+  become: yes
+  service:
+    name: sshd
+    state: restarted
+  when: sshd_config.changed
